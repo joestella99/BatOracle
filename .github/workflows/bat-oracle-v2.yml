@@ -1,0 +1,42 @@
+name: Bat Oracle v2 evaluation
+on:
+  push:
+    branches:
+      - feature/bat-oracle-v2-matchup-backtest
+    paths:
+      - .github/workflows/bat-oracle-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: v2/requirements.txt
+      - name: Install requirements
+        run: pip install -r v2/requirements.txt
+      - name: Verify data and modeling logic
+        run: PYTHONPATH=v2 python -m pytest -q v2/tests
+      - name: Run real Statcast chronological sample
+        working-directory: v2
+        run: |
+          python -m bat_oracle.simulate \
+            --start 2024-04-01 --end 2024-05-15 \
+            --train-start 2024-04-15 \
+            --test-start 2024-05-01 --test-end 2024-05-15 \
+            --per-day 12
+      - name: Save genuine evaluation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bat-oracle-v2-backtest
+          path: v2/data/backtests/
+          if-no-files-found: ignore
